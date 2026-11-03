@@ -7,7 +7,7 @@ APP="build/Slow Horizon.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-xcrun swiftc -O main.swift Renderer.swift Sky.swift Sound.swift -o "$APP/Contents/MacOS/SlowHorizon"
+xcrun swiftc -O main.swift Renderer.swift Sky.swift Sound.swift ClaudeFM.swift -o "$APP/Contents/MacOS/SlowHorizon"
 cp Shaders.metal "$APP/Contents/Resources/"
 [[ -f AppIcon.icns ]] && cp AppIcon.icns "$APP/Contents/Resources/"
 

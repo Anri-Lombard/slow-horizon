@@ -4,9 +4,9 @@ A calm sea for your second screen, so it stops competing with the work on your f
 
 ![The sea at dusk with boats on the horizon](docs/dusk.jpg)
 
-Slow Horizon covers one display with open water at the real time of day. Whatever was on that display stays where it was, hidden until you quit. Clicks on the scene do nothing, and it never takes keyboard focus, so your typing stays in the app you're working in.
+Slow Horizon covers one display with open water at the real time of day. Whatever was on that display stays where it was, hidden until you quit. Clicks on the sea do nothing, and the app never takes keyboard focus, so your typing stays in the app you're working in.
 
-It's a native macOS app with no dependencies, no network access and no accounts. It's silent unless you turn on **Sea Sound**.
+It's a native macOS app with no dependencies or accounts. The sea uses no network and stays silent unless you turn on **Sea Sound**. You can also switch the display to Anthropic's [Claude FM](https://clau.de/radio) stream, the only part that goes online.
 
 ## What changes, and how slowly
 
@@ -70,15 +70,23 @@ This installs `Slow Horizon.app` to `~/Applications`, where Spotlight finds it.
 
 Open the app to start it, from Spotlight or `~/Applications`. It has no Dock icon; it shows as a small waves icon in the menu bar at the top of the screen. Open it again to quit, or use **End Slow Horizon** in that menu.
 
-It takes the display that doesn't hold the Claude desktop app, because that's what it was built to sit beside. Without Claude open, it takes a display other than your active one. **Move to Next Display** in the menu bar overrides that until you quit. With one display it hides and waits for a second.
+It takes the display that doesn't hold the Claude desktop app, because that's what it was built to sit beside. Without Claude open, it takes a display other than your active one. **Move to Next Display** in the menu bar overrides that, and the app remembers your choice next time. With one display it hides and waits for a second.
 
 **Moving Water** in the menu bar switches between the animated sea and a still picture that keeps following the sky. The water also stops by itself on battery and in Low Power Mode.
 
-**Hide For** puts the display back for 5, 15 or 30 minutes, or 1 or 2 hours, then fades the sea back in over 4 seconds. **Show Now** brings it back early.
+**Hide For** puts the display back for 1, 5, 15 or 30 minutes, or 1 or 2 hours, then fades the sea back in over 4 seconds. **Show Now** brings it back early.
 
 ### Sea Sound
 
 **Sea Sound** in the menu bar plays slow, irregular waves through your Mac's current output, and it follows the wind in the scene. It fades in over 4 seconds and stops when the scene is hidden. It's generated as it plays, so there's no recording to loop. It's off by default for two reasons: a [meta-analysis of 65 studies](https://pmc.ncbi.nlm.nih.gov/articles/PMC6139986/) found a small comprehension cost from background noise while reading (g = −0.17), and you may prefer your own audio. The same analysis found the largest costs from speech and lyrics, so the app has no music.
+
+### Claude FM
+
+**Claude FM** in the menu bar replaces the sea with the live YouTube stream, picture and sound, on the same display. **Calm Sea** switches back, and **Hide For** stops the stream until the time is up. The player's own controls work, including pause and volume, and clicking them leaves your keyboard focus where it was.
+
+YouTube's API policies don't allow playing the audio without its visible player, so the app can't play the stream behind the sea. Picking Claude FM contacts `clau.de` and YouTube, and the player keeps its usual cache and cookies on your Mac. YouTube may show ads, which the app doesn't block.
+
+If the player wrongly reports that the live stream has ended, the app reloads it within a few seconds. The player itself holds only about 5 seconds of buffer, and the app can't change that, so a brief network slowdown can still pause the music. In one 5-minute test it stalled 3 times, for 9 seconds in total, and in another it didn't stall at all.
 
 ### Your location
 
@@ -109,6 +117,8 @@ Measured on an M1 Pro driving a 2560×1440 display at 144 Hz, on mains power:
 
 Sea Sound adds about 1% of a core to the app, with no measurable change in its memory. macOS's audio service rises from 1% to 12 to 14% of a core while it plays, and it did the same when playing a file with `afplay`, so that part is what any audio costs on this Mac.
 
+Claude FM measured about 21% of a core across its web processes, 0.7% for the app itself, 150 to 170 MB of web process memory, 9 to 15% GPU and 23 to 28% window server CPU, playing 1080p on a 1920×1080 display. Audio adds the same 10 to 14% of a core as above. Only 2 of 3,358 frames dropped in a 2-minute run.
+
 The readings come from an otherwise quiet machine, and the GPU and window server rows include putting the picture on screen. Of the GPU figure, drawing the sea itself takes only 0.55 ms per frame, so most of the cost is the system compositing a moving part of the screen. With the screen locked, the app measured 0% CPU and the GPU stayed at 0%.
 
 The sea runs at a whole divisor of the display's refresh rate so that frames stay up for equal time: 36 frames per second at 144 Hz. In a 15-second sample on that display, 93% of frames stayed up for one 28 ms interval and the rest were one refresh off.
@@ -125,6 +135,7 @@ Sky and sea are separate layers. The sky is redrawn every 3 seconds at full reso
 - `Sky.swift`: sun, moon and stars, weather, and the schedule for boats and whales
 - `Renderer.swift`: Metal setup and drawing
 - `Sound.swift`: the generated sea sound
+- `ClaudeFM.swift`: the Claude FM player
 - `main.swift`: the window, the menu bar item and choosing a display
 
 Shaders compile when the app launches, so building needs no Metal toolchain.

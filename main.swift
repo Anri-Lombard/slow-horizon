@@ -10,15 +10,18 @@ final class QuietPanel: NSPanel {
 }
 
 final class PassiveView: NSView {
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    var acceptsClicks = false
+    override func hitTest(_ point: NSPoint) -> NSView? { acceptsClicks ? super.hitTest(point) : nil }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let movingWaterKey = "movingWater"
     private static let seaSoundKey = "seaSound"
+    private static let claudeFMKey = "claudeFM"
+    private static let displayKey = "displayID"
     private static let skySeconds = 3.0
     private static let returnFadeSeconds = 4.0
-    private static let hideChoices = [("5 Minutes", 300), ("15 Minutes", 900), ("30 Minutes", 1800), ("1 Hour", 3600), ("2 Hours", 7200)]
+    private static let hideChoices = [("1 Minute", 60), ("5 Minutes", 300), ("15 Minutes", 900), ("30 Minutes", 1800), ("1 Hour", 3600), ("2 Hours", 7200)]
 
     private let panel = QuietPanel(
         contentRect: .zero,
@@ -29,15 +32,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var movingItem: NSMenuItem?
     private var soundItem: NSMenuItem?
+    private var seaItem: NSMenuItem?
+    private var claudeFMItem: NSMenuItem?
     private var showItem: NSMenuItem?
     private var hiddenUntil: Date?
     private let sound = SeaSound()
+    private let claudeFM = ClaudeFM()
     private var skyTimer: Timer?
-    private var chosenScreen: NSScreen?
     private var renderer: SceneRenderer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UserDefaults.standard.register(defaults: [Self.movingWaterKey: true, Self.seaSoundKey: false])
+        UserDefaults.standard.register(defaults: [Self.movingWaterKey: true, Self.seaSoundKey: false, Self.claudeFMKey: false])
 
         // Above the menu bar, so whatever is already open on that display disappears
         // without being rearranged.
@@ -64,6 +69,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: "Slow Horizon")
         let menu = NSMenu()
+        menu.autoenablesItems = false
+        let sea = menu.addItem(withTitle: "Calm Sea", action: #selector(chooseSea), keyEquivalent: "")
+        sea.target = self
+        seaItem = sea
+        let radio = menu.addItem(withTitle: "Claude FM", action: #selector(chooseClaudeFM), keyEquivalent: "")
+        radio.target = self
+        claudeFMItem = radio
+        menu.addItem(.separator())
         let moving = menu.addItem(withTitle: "Moving Water", action: #selector(toggleMovingWater), keyEquivalent: "")
         moving.target = self
         moving.state = UserDefaults.standard.bool(forKey: Self.movingWaterKey) ? .on : .off
@@ -96,6 +109,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         center.addObserver(self, selector: #selector(refreshAnimation), name: NSWindow.didChangeOcclusionStateNotification, object: panel)
         center.addObserver(self, selector: #selector(refreshAnimation), name: .NSProcessInfoPowerStateDidChange, object: nil)
 
+        claudeFM.onFailure = { [weak self] in
+            self?.setClaudeFM(false)
+            self?.claudeFMItem?.title = "Claude FM (couldn't connect)"
+        }
+        updateSceneItems()
         placePanel()
 
         let timer = Timer(timeInterval: Self.skySeconds, repeats: true) { [weak self] _ in self?.tick() }
@@ -129,7 +147,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard isShowing else { return }
         sound.setWind(Weather.at(Date()).wind)
         refreshAnimation()
-        renderer?.update()
+        if playingClaudeFM {
+            claudeFM.reloadIfEnded()
+        } else {
+            renderer?.update()
+        }
+    }
+
+    private var playingClaudeFM: Bool { UserDefaults.standard.bool(forKey: Self.claudeFMKey) }
+
+    @objc private func chooseSea() { setClaudeFM(false) }
+
+    @objc private func chooseClaudeFM() {
+        claudeFMItem?.title = "Claude FM"
+        setClaudeFM(true)
+    }
+
+    private func setClaudeFM(_ on: Bool) {
+        UserDefaults.standard.set(on, forKey: Self.claudeFMKey)
+        updateSceneItems()
+        refreshAnimation()
+        if !on { renderer?.update() }
+    }
+
+    private func updateSceneItems() {
+        let radio = playingClaudeFM
+        seaItem?.state = radio ? .off : .on
+        claudeFMItem?.state = radio ? .on : .off
+        movingItem?.isEnabled = !radio
+        soundItem?.isEnabled = !radio
+        (panel.contentView as? PassiveView)?.acceptsClicks = radio
     }
 
     @objc private func hideFor(_ sender: NSMenuItem) {
@@ -173,21 +220,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let onMains = IOPSGetTimeRemainingEstimate() == kIOPSTimeRemainingUnlimited
         let moving = UserDefaults.standard.bool(forKey: Self.movingWaterKey)
         let allowed = moving && onMains && !ProcessInfo.processInfo.isLowPowerModeEnabled
-        renderer?.setSeaAnimating(allowed && isShowing)
-        sound.setPlaying(UserDefaults.standard.bool(forKey: Self.seaSoundKey) && isShowing)
+        let radio = playingClaudeFM
+        renderer?.setSeaAnimating(allowed && isShowing && !radio)
+        sound.setPlaying(UserDefaults.standard.bool(forKey: Self.seaSoundKey) && isShowing && !radio)
+        if radio && isShowing, let content = panel.contentView {
+            claudeFM.start(in: content)
+        } else {
+            claudeFM.stop()
+        }
     }
 
     @objc private func moveToNextDisplay() {
         let screens = NSScreen.screens
         guard let current = panel.screen, let index = screens.firstIndex(of: current) else { return }
-        chosenScreen = screens[(index + 1) % screens.count]
+        UserDefaults.standard.set(displayID(screens[(index + 1) % screens.count]), forKey: Self.displayKey)
         placePanel()
     }
 
     @objc private func placePanel() {
         guard hiddenUntil == nil else { return }
         let work = screenHoldingClaude() ?? NSScreen.main
-        let chosen = chosenScreen.flatMap { NSScreen.screens.contains($0) ? $0 : nil }
+        // A saved choice can't apply to a lone display, which is the screen being worked on.
+        let saved = UserDefaults.standard.integer(forKey: Self.displayKey)
+        let chosen = NSScreen.screens.count > 1 ? NSScreen.screens.first { displayID($0) == saved } : nil
         guard let target = chosen ?? NSScreen.screens.first(where: { $0.frame != work?.frame }) else {
             // One display means that display is the study screen, so wait for a second one.
             panel.orderOut(nil)
@@ -199,6 +254,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         renderer?.layout(sceneSize: target.frame.size, scale: target.backingScaleFactor)
         panel.orderFrontRegardless()
         refreshAnimation()
+    }
+
+    private func displayID(_ screen: NSScreen) -> Int {
+        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.intValue ?? 0
     }
 
     private func screenHoldingClaude() -> NSScreen? {
