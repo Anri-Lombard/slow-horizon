@@ -6,7 +6,7 @@ A calm sea for your second screen, so it stops competing with the work on your f
 
 Slow Horizon covers one display with open water at the real time of day. Whatever was on that display stays where it was, hidden until you quit. Clicks on the scene do nothing, and it never takes keyboard focus, so your typing stays in the app you're working in.
 
-It's a native macOS app with no dependencies, no network access and no accounts.
+It's a native macOS app with no dependencies, no network access and no accounts. It's silent unless you turn on **Sea Sound**.
 
 ## What changes, and how slowly
 
@@ -74,6 +74,12 @@ It takes the display that doesn't hold the Claude desktop app, because that's wh
 
 **Moving Water** in the menu bar switches between the animated sea and a still picture that keeps following the sky. The water also stops by itself on battery and in Low Power Mode.
 
+**Hide For** puts the display back for 5, 15 or 30 minutes, or 1 or 2 hours, then fades the sea back in over 4 seconds. **Show Now** brings it back early.
+
+### Sea Sound
+
+**Sea Sound** in the menu bar plays slow, irregular waves through your Mac's current output, and it follows the wind in the scene. It fades in over 4 seconds and stops when the scene is hidden. It's generated as it plays, so there's no recording to loop. It's off by default for two reasons: a [meta-analysis of 65 studies](https://pmc.ncbi.nlm.nih.gov/articles/PMC6139986/) found a small comprehension cost from background noise while reading (g = −0.17), and you may prefer your own audio. The same analysis found the largest costs from speech and lyrics, so the app has no music.
+
 ### Your location
 
 By default the longitude comes from your time zone, which puts the sun within about an hour of right, and the latitude is 35° north. For an accurate sky, set both (west and south are negative) and restart the app:
@@ -101,6 +107,8 @@ Measured on an M1 Pro driving a 2560×1440 display at 144 Hz, on mains power:
 | GPU, whole machine | 16 to 17% | About 0% |
 | Window server CPU | 22 to 25% | Close to idle |
 
+Sea Sound adds about 1% of a core to the app, with no measurable change in its memory. macOS's audio service rises from 1% to 12 to 14% of a core while it plays, and it did the same when playing a file with `afplay`, so that part is what any audio costs on this Mac.
+
 The readings come from an otherwise quiet machine, and the GPU and window server rows include putting the picture on screen. Of the GPU figure, drawing the sea itself takes only 0.55 ms per frame, so most of the cost is the system compositing a moving part of the screen. With the screen locked, the app measured 0% CPU and the GPU stayed at 0%.
 
 The sea runs at a whole divisor of the display's refresh rate so that frames stay up for equal time: 36 frames per second at 144 Hz. In a 15-second sample on that display, 93% of frames stayed up for one 28 ms interval and the rest were one refresh off.
@@ -116,6 +124,7 @@ Sky and sea are separate layers. The sky is redrawn every 3 seconds at full reso
 - `Shaders.metal`: the wave bake, sky, sea, boats, rain and rainbow
 - `Sky.swift`: sun, moon and stars, weather, and the schedule for boats and whales
 - `Renderer.swift`: Metal setup and drawing
+- `Sound.swift`: the generated sea sound
 - `main.swift`: the window, the menu bar item and choosing a display
 
 Shaders compile when the app launches, so building needs no Metal toolchain.

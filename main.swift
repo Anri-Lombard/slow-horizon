@@ -15,7 +15,10 @@ final class PassiveView: NSView {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let movingWaterKey = "movingWater"
+    private static let seaSoundKey = "seaSound"
     private static let skySeconds = 3.0
+    private static let returnFadeSeconds = 4.0
+    private static let hideChoices = [("5 Minutes", 300), ("15 Minutes", 900), ("30 Minutes", 1800), ("1 Hour", 3600), ("2 Hours", 7200)]
 
     private let panel = QuietPanel(
         contentRect: .zero,
@@ -25,12 +28,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private var statusItem: NSStatusItem?
     private var movingItem: NSMenuItem?
+    private var soundItem: NSMenuItem?
+    private var showItem: NSMenuItem?
+    private var hiddenUntil: Date?
+    private let sound = SeaSound()
     private var skyTimer: Timer?
     private var chosenScreen: NSScreen?
     private var renderer: SceneRenderer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UserDefaults.standard.register(defaults: [Self.movingWaterKey: true])
+        UserDefaults.standard.register(defaults: [Self.movingWaterKey: true, Self.seaSoundKey: false])
 
         // Above the menu bar, so whatever is already open on that display disappears
         // without being rearranged.
@@ -61,6 +68,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         moving.target = self
         moving.state = UserDefaults.standard.bool(forKey: Self.movingWaterKey) ? .on : .off
         movingItem = moving
+        let seaSound = menu.addItem(withTitle: "Sea Sound", action: #selector(toggleSeaSound), keyEquivalent: "")
+        seaSound.target = self
+        seaSound.state = UserDefaults.standard.bool(forKey: Self.seaSoundKey) ? .on : .off
+        soundItem = seaSound
+        menu.addItem(.separator())
+        let hideMenu = NSMenu()
+        for (title, seconds) in Self.hideChoices {
+            let choice = hideMenu.addItem(withTitle: title, action: #selector(hideFor(_:)), keyEquivalent: "")
+            choice.target = self
+            choice.tag = seconds
+        }
+        menu.addItem(withTitle: "Hide For", action: nil, keyEquivalent: "").submenu = hideMenu
+        let show = menu.addItem(withTitle: "Show Now", action: #selector(showAgain), keyEquivalent: "")
+        show.target = self
+        show.isHidden = true
+        showItem = show
         let next = menu.addItem(withTitle: "Move to Next Display", action: #selector(moveToNextDisplay), keyEquivalent: "")
         next.target = self
         menu.addItem(.separator())
@@ -91,15 +114,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        sound.stopForQuit()
         runShortcut("Slow Horizon Off")
     }
 
     private var isShowing: Bool { panel.isVisible && panel.occlusionState.contains(.visible) }
 
     private func tick() {
+        // Checked here rather than on its own timer, so the return still happens after the Mac sleeps.
+        if let hiddenUntil {
+            if Date() >= hiddenUntil { showAgain() }
+            return
+        }
         guard isShowing else { return }
+        sound.setWind(Weather.at(Date()).wind)
         refreshAnimation()
         renderer?.update()
+    }
+
+    @objc private func hideFor(_ sender: NSMenuItem) {
+        let until = Date().addingTimeInterval(TimeInterval(sender.tag))
+        hiddenUntil = until
+        showItem?.title = "Show Now (back at \(until.formatted(date: .omitted, time: .shortened)))"
+        showItem?.isHidden = false
+        panel.orderOut(nil)
+        refreshAnimation()
+    }
+
+    // The return can happen mid-thought with nobody expecting it, so the scene fades in.
+    @objc private func showAgain() {
+        hiddenUntil = nil
+        showItem?.isHidden = true
+        panel.alphaValue = 0
+        placePanel()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Self.returnFadeSeconds
+            panel.animator().alphaValue = 1
+        }
+    }
+
+    @objc private func toggleSeaSound() {
+        let on = !UserDefaults.standard.bool(forKey: Self.seaSoundKey)
+        UserDefaults.standard.set(on, forKey: Self.seaSoundKey)
+        soundItem?.state = on ? .on : .off
+        sound.setWind(Weather.at(Date()).wind)
+        refreshAnimation()
     }
 
     @objc private func toggleMovingWater() {
@@ -115,6 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let moving = UserDefaults.standard.bool(forKey: Self.movingWaterKey)
         let allowed = moving && onMains && !ProcessInfo.processInfo.isLowPowerModeEnabled
         renderer?.setSeaAnimating(allowed && isShowing)
+        sound.setPlaying(UserDefaults.standard.bool(forKey: Self.seaSoundKey) && isShowing)
     }
 
     @objc private func moveToNextDisplay() {
@@ -125,6 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func placePanel() {
+        guard hiddenUntil == nil else { return }
         let work = screenHoldingClaude() ?? NSScreen.main
         let chosen = chosenScreen.flatMap { NSScreen.screens.contains($0) ? $0 : nil }
         guard let target = chosen ?? NSScreen.screens.first(where: { $0.frame != work?.frame }) else {
