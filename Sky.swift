@@ -210,8 +210,10 @@ struct Weather {
 
     static func at(_ date: Date) -> Weather {
         let hours = date.timeIntervalSince1970 / 3600
-        let cover = smooth(0.3, 0.85, drifting(hours / 5, seed: 1) * 0.6 + drifting(hours / 17, seed: 2) * 0.4)
-        let rain = smooth(0.6, 0.85, cover) * smooth(0.5, 0.72, drifting(hours / 3, seed: 3))
+        // Fair weather is the norm. Long grey spells are realistic but not restful, and restful is
+        // what this is for.
+        let cover = smooth(0.45, 1.0, drifting(hours / 5, seed: 1) * 0.6 + drifting(hours / 17, seed: 2) * 0.4)
+        let rain = smooth(0.35, 0.6, cover) * smooth(0.6, 0.8, drifting(hours / 3, seed: 3))
         return Weather(
             cover: cover,
             wind: min(1, drifting(hours / 7, seed: 5) * 0.8 + cover * 0.25),
@@ -260,14 +262,13 @@ func whale(at date: Date) -> SIMD3<Float> {
 }
 
 // Only when rain and a low sun coincide, as with a real one.
-func rainbowStrength(_ weather: Weather, sunAltitude: Double, date: Date) -> Double {
-    smooth(0.68, 0.8, drifting(date.timeIntervalSince1970 / 3600 / 2, seed: 8))
-        * smooth(0.15, 0.6, weather.rain) * smooth(0.02, 0.1, sunAltitude) * (1 - smooth(0.5, 0.7, sunAltitude))
+func rainbowStrength(_ weather: Weather, sunAltitude: Double) -> Double {
+    smooth(0.15, 0.6, weather.rain) * smooth(0.02, 0.1, sunAltitude) * (1 - smooth(0.5, 0.7, sunAltitude))
         * (1 - 0.5 * smooth(0.6, 1, weather.cover)) * (1 - weather.fog)
 }
 
-// Colour by solar altitude. Daylight is held dim and grey on purpose: a bright sky on a second
-// screen pulls the eye as much as motion does.
+// Colour by solar altitude. Daylight is soft and well short of a real sky's brightness, because a
+// glaring second screen pulls the eye as much as motion does.
 private func colour(_ hex: UInt32) -> SIMD3<Float> {
     SIMD3(Float((hex >> 16) & 255), Float((hex >> 8) & 255), Float(hex & 255)) / 255
 }
@@ -280,9 +281,9 @@ private let palette: [(alt: Double, colours: [SIMD3<Float>])] = [
     (-6, [0x141b33, 0x453644, 0x262333, 0x0a0c15, 0x5a3238]),
     (-1, [0x232d4b, 0x7d4c3b, 0x4a3435, 0x10121d, 0x8a4526]),
     (3, [0x303b54, 0x96694d, 0x655045, 0x161a26, 0xa56435]),
-    (10, [0x3a475c, 0x7d7468, 0x585c5e, 0x1c2632, 0x6d5337]),
-    (30, [0x3e4c60, 0x6b7377, 0x515e65, 0x212d38, 0x3f3b33]),
-    (90, [0x3b4c60, 0x6f7a80, 0x55636b, 0x24313b, 0x3a3a35]),
+    (10, [0x41608a, 0x9a9488, 0x627a84, 0x1d3648, 0x6d5337]),
+    (30, [0x44699a, 0x93aebb, 0x5f8797, 0x1f4356, 0x3f3b33]),
+    (90, [0x3f6b9e, 0x9bb7c3, 0x628c9c, 0x214a5d, 0x3a3a35]),
 ].map { (alt: $0.0, colours: $0.1.map(colour)) }
 
 func paletteAt(altitude: Double) -> [SIMD3<Float>] {

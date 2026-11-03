@@ -184,15 +184,19 @@ fragment float4 drawSky(float4 position [[position]],
   float field = 0.5 + (waveMap.sample(waveSampler, cp * 0.125).b + waveMap.sample(waveSampler, cp * 0.047 + 0.37).b - 1.0) * 0.75;
   float c = smoothstep(0.42, 0.68, field + sky.cloudAmount);
   float3 cloudTint = mix(s.skyHor * 0.82, s.skyTop * 0.72 + s.glow * 0.9 * exp(-sunDx * 0.7), 0.6 - 0.25 * v);
-  // Thick cloud keeps its shape through lighter and darker undersides.
-  cloudTint *= 0.84 + 0.75 * (field - 0.5);
+  // Thick cloud keeps its shape through lighter and darker undersides. By day cloud is brighter
+  // than the sky behind it, or an overcast afternoon reads as nightfall.
+  float daylight = 1.0 - max(s.night, s.lowSun);
+  float cloudGrey = dot(cloudTint, float3(0.3, 0.59, 0.11));
+  cloudTint = mix(cloudTint, float3(cloudGrey), 0.6 * daylight) * (0.84 + 0.75 * (field - 0.5)) * (1.0 + 0.42 * daylight);
   col += starLayer.sample(starSampler, position.xy / sky.layerSize).rgb * (1.0 - c * 0.8);
   col = mix(col, cloudTint + s.night * float3(0.012, 0.014, 0.02) * s.moonUp, c * 0.72);
 
   // Mixed towards a fixed tone, not added, so the disc stays close to the sky around it.
-  float3 disc = mix(float3(0.64, 0.65, 0.62), float3(0.8, 0.6, 0.44), s.lowSun);
+  float3 disc = mix(float3(0.95, 0.95, 0.9), float3(0.98, 0.76, 0.55), s.lowSun * s.lowSun);
   col = mix(col, disc, s.sunUp * (1.0 - smoothstep(0.006, 0.046, dSun)) * (1.0 - c * 0.75) * 0.82);
   col += s.glow * s.sunUp * exp(-dSun * 15.0) * 0.3;
+  col += float3(0.85, 0.85, 0.8) * s.sunUp * (1.0 - c * 0.5) * exp(-dSun * 9.0) * 0.2;
   col += float3(0.75, 0.8, 0.9) * s.moonUp * exp(-dMoon * 13.0) * 0.1;
 
   // Curtains lean with the wind and have no edge at the top, where they merge into the cloud.

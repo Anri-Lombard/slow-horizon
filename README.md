@@ -16,18 +16,18 @@ A day takes a real day. The sun, moon, moon phase and bright stars are calculate
 
 | | How it behaves | How often |
 |---|---|---|
-| Clear sky | Thin high cloud at most | 46% of the time |
-| Overcast | Builds over about two hours at its quickest | 17% |
+| Clear sky | Thin high cloud at most | 75% of the time |
+| Overcast | A pale, bright grey that builds over two hours or more | 3% |
 | Fog | The horizon dissolves | 5% |
-| Rain | Distant curtains under the cloud, never on screen | 7% |
-| Calm and rough seas | Follow the wind, gradually | 27% and 26% |
+| Rain | A distant shower with the sun still out, never on screen | 3% |
+| Calm and rough seas | Follow the wind, gradually | 34% and 18% |
 | Boats | A freighter, a yacht and a fishing boat, each taking hours to cross, with lights at night | At least one in view 65% of the time |
 | Whale | A far-off blow that fades in and out over 40 seconds, in daylight only | About 6 scheduled a day, fewer seen |
-| Rainbow | Only when rain and a low sun coincide | About 30 hours a year at Cape Town's latitude |
+| Rainbow | Only when rain and a low sun coincide | About 75 hours a year at Cape Town's latitude |
 | Tall ship | Passes about once a week | About 155 hours a year |
 | Iceberg | Takes two days to pass | About 415 hours a year |
 
-The figures come from sampling the generator across three simulated years, counting clear as cover below 25%, overcast as above 75%, and fog and rain as above 50% and 30% strength. Weather is generated, not fetched, and it follows the clock, so restarting the app doesn't change it.
+The figures come from sampling the generator across three simulated years, counting clear as cover below 25%, overcast as above 75%, and fog and rain as above 50% and 30% strength. Weather is generated, not fetched, so it won't match the sky outside your window. It's weighted towards fair days on purpose, because long grey spells aren't restful. It follows the clock, so restarting the app doesn't change it.
 
 Some things are deliberately missing: lightning, shooting stars, leaping dolphins and birds. The first three are sudden or fast, and birds at this distance look like dirt on the screen.
 

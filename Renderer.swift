@@ -212,13 +212,13 @@ final class SceneRenderer: NSObject, MTKViewDelegate {
             return (colour + (grey - colour) * amount) * dim
         }
         let colours = paletteAt(altitude: sunDegrees)
-        let horizonColour = muted(colours[1], 0.35 * overcast, 1 - 0.1 * overcast - 0.12 * rain)
-        let farColour = muted(colours[2], 0.3 * overcast, 1 - 0.1 * overcast - 0.1 * rain)
+        let horizonColour = muted(colours[1], 0.3 * overcast, 1 - 0.03 * overcast)
+        let farColour = muted(colours[2], 0.25 * overcast, 1 - 0.03 * overcast)
         let haze = (horizonColour + farColour) * 0.5
-        shared.skyTop = muted(colours[0], 0.3 * overcast, 1 - 0.14 * overcast - 0.12 * rain)
+        shared.skyTop = muted(colours[0], 0.35 * overcast, 1 - 0.03 * overcast)
         shared.skyHor = horizonColour + (haze * 1.05 - horizonColour) * 0.7 * fog
         shared.seaFar = farColour + (haze - farColour) * 0.8 * fog
-        shared.seaNear = muted(colours[3], 0.25 * overcast, 1 - 0.1 * overcast)
+        shared.seaNear = muted(colours[3], 0.25 * overcast, 1 - 0.04 * overcast)
         // Fades before the sun wraps from one side of the view to the other, behind the viewer.
         shared.glow = colours[4] * (1 - 0.72 * overcast) * Float(1 - smooth(0.55, 0.72, abs(skyX(sunPos.az) - 0.5)))
         shared.fog = fog
@@ -226,7 +226,7 @@ final class SceneRenderer: NSObject, MTKViewDelegate {
         shared.rainX = Float(weather.rainX)
         shared.night = Float(night)
         shared.sun = SIMD2(Float(skyX(sunPos.az)), Float(sunY))
-        shared.sunUp = Float(smooth(-0.01, 0.03, sunPos.alt)) * (1 - 0.72 * overcast) * (1 - 0.45 * fog)
+        shared.sunUp = Float(smooth(-0.01, 0.03, sunPos.alt)) * (1 - 0.6 * overcast) * (1 - 0.45 * fog)
         shared.lowSun = Float(1 - smooth(0, 0.3, sunY - horizonFraction))
         shared.moon = SIMD2(Float(skyX(moonPos.az)), Float(skyY(moonPos.alt)))
         shared.moonUp = Float(smooth(-0.01, 0.06, moonPos.alt) * moonIllumination(sun: sunEq, moon: moonEq) * (0.2 + 0.8 * night)) * (1 - 0.8 * overcast) * (1 - 0.5 * fog)
@@ -244,7 +244,7 @@ final class SceneRenderer: NSObject, MTKViewDelegate {
         shared.boats = boats(at: date)
         shared.whale = whale(at: date)
         shared.whale.z *= Float(1 - night) * (1 - fog)
-        shared.rainbow = SIMD3(Float(skyX(sunPos.az + .pi)), Float(-sunPos.alt), Float(rainbowStrength(weather, sunAltitude: sunPos.alt, date: date)))
+        shared.rainbow = SIMD3(Float(skyX(sunPos.az + .pi)), Float(-sunPos.alt), Float(rainbowStrength(weather, sunAltitude: sunPos.alt)))
 
         skyView.draw()
         if !seaAnimating { seaView.draw() }
